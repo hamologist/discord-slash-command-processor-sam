@@ -40,8 +40,6 @@ Resources:
       Handler: processor/src/handler.lambdaHandler
       Runtime: nodejs14.x
       MemorySize: 256
-      Architectures:
-        - arm64
       Events:
         HttpPost:
           Type: Api
@@ -62,8 +60,6 @@ Resources:
       CodeUri: build
       Handler: processor/src/command-router.lambdaHandler
       Runtime: nodejs14.x
-      Architectures:
-        - arm64
       Environment:
         Variables:
           DISCORD_APPLICATION_ID: !Ref DiscordApplicationId

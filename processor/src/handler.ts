@@ -1,52 +1,16 @@
-import AJV, { JSONSchemaType } from 'ajv';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { sign } from 'tweetnacl';
 import { UnverifiedInteraction } from './types/interaction';
 import { InvocationType, InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 
-const ajv = new AJV();
-
 export const lambdaHandler = async (
     event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-    const schema: JSONSchemaType<UnverifiedInteraction> = {
-        type: 'object',
-        properties: {
-            type: { type: 'integer' },
-            token: { type: 'string' },
-            data: {
-                type: 'object',
-                properties: {
-                    id: { type: 'string' },
-                    name: { type: 'string' },
-                    options: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                name: { type: 'string' },
-                                value: { type: 'string' },
-                            },
-                            required: ['name', 'value']
-                        }
-                    }
-                },
-                required: ['options'],
-                nullable: true,
-            }
-        },
-        required: ['type', 'token'],
-    }
     if (event.body === null) {
         throw Error('Event missing body');
     }
 
-    const body = JSON.parse(event.body);
-    const validate = ajv.compile(schema);
-
-    if (!validate(body)) {
-        throw new Error(validate.errors!.join(', '));
-    }
+    const body: UnverifiedInteraction = JSON.parse(event.body);
 
     for (const [key, value] of Object.entries(event.headers)) {
         event.headers[key.toLowerCase()] = value;
