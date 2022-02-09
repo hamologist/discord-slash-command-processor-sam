@@ -4,10 +4,30 @@ Description: >
   discord-slash-command-processor
 Globals:
   Function:
-    Timeout: 3
-    Environment:
-      Variables:
-        DISCORD_PUBLIC_KEY: ''
+    Timeout: 5
+
+Parameters:
+  HostedZoneName:
+    Type: String
+    Default: example.com.
+    Description: "The Route 53 Hosted zone domain name that record changes should be registered with"
+  DomainName:
+    Type: String
+    Default: api.example.com
+    Description: "The subdomain to register resources with on the project's Hosted zone"
+  CertificateArn:
+    Type: String
+    Default: arn:aws:acm:us-east-1:...:certificate/...
+    Description: The ARN for a valid AWS certificate from the "AWS Certicate Manager""
+  DiscordPublicKey:
+    Type: String
+    Description: "The Discord public key for the bot that will hit your Discord bot's interactions endpoint"
+  EmojifyEndpoint:
+    Type: String
+    Description: "The post endpoint serving the Emojify API"
+  RollEndpoint:
+    Type: String
+    Description: "The post endpoint serving the Dice Roll API"
 
 Resources:
   DiscordSlashCommandProcessorFunction:
@@ -19,11 +39,40 @@ Resources:
       Architectures:
         - arm64
       Events:
-        PlayerCreate:
+        HttpPost:
           Type: Api
           Properties:
             Path: /slash-command
             Method: post
+      Environment:
+        Variables:
+          DISCORD_PUBLIC_KEY: !Ref DiscordPublicKey
+          EMOJIFY_ENDPOINT: !Ref EmojifyEndpoint
+          ROLL_ENDPOINT: !Ref RollEndpoint
+
+  APIDomainName:
+    Type: AWS::ApiGateway::DomainName
+    Properties:
+      CertificateArn: !Ref CertificateArn
+      DomainName: !Ref DomainName
+
+  APIBasePathMapping:
+    Type: AWS::ApiGateway::BasePathMapping
+    Properties:
+      DomainName: !Ref APIDomainName
+      RestApiId: !Ref ServerlessRestApi
+      Stage: Prod
+
+  APIDomain:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneName: !Ref HostedZoneName
+      RecordSets:
+        - Name: !Ref DomainName
+          Type: A
+          AliasTarget:
+            DNSName: !GetAtt APIDomainName.DistributionDomainName
+            HostedZoneId: Z2FDTNDATAQYW2 # static ID for CloudFront aliases
 
 #Outputs:
   # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
