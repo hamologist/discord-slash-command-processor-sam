@@ -22,6 +22,9 @@ Parameters:
   DiscordPublicKey:
     Type: String
     Description: "The Discord public key for the bot that will hit your Discord bot's interactions endpoint"
+  DiscordApplicationId:
+    Type: String
+    Description: "The Discord application Id for the bot that will hit your Discord bot's interactions endpoint"
   EmojifyEndpoint:
     Type: String
     Description: "The post endpoint serving the Emojify API"
@@ -30,12 +33,13 @@ Parameters:
     Description: "The post endpoint serving the Dice Roll API"
 
 Resources:
-  DiscordSlashCommandProcessorFunction:
+  DiscordSlashCommandFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: build
       Handler: processor/src/handler.lambdaHandler
       Runtime: nodejs14.x
+      MemorySize: 256
       Architectures:
         - arm64
       Events:
@@ -44,9 +48,25 @@ Resources:
           Properties:
             Path: /slash-command
             Method: post
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName:
+              !Ref DiscordSlashCommandRouterFunction
       Environment:
         Variables:
           DISCORD_PUBLIC_KEY: !Ref DiscordPublicKey
+          COMMAND_ROUTER_FUNCTION_NAME: !Ref DiscordSlashCommandRouterFunction
+  DiscordSlashCommandRouterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: build
+      Handler: processor/src/command-router.lambdaHandler
+      Runtime: nodejs14.x
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          DISCORD_APPLICATION_ID: !Ref DiscordApplicationId
           EMOJIFY_ENDPOINT: !Ref EmojifyEndpoint
           ROLL_ENDPOINT: !Ref RollEndpoint
 

@@ -61,7 +61,8 @@ export const rollProcessor = async (input: string): Promise<{ content: string, f
         }
 
         const rollEndpoint = process.env.ROLL_ENDPOINT;
-        if (rollEndpoint === undefined) {
+        if (!rollEndpoint) {
+            console.log('Missing Environment Variable: ROLL_ENDPOINT');
             throw new Error('Server not properly configured');
         }
 

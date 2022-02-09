@@ -1,30 +1,19 @@
 import AJV, { JSONSchemaType } from 'ajv';
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import { sign } from 'tweetnacl';
-import axios from 'axios';
-import { rollProcessor } from './roll-processor';
+import { UnverifiedInteraction } from './types/interaction';
+import { InvocationType, InvokeCommand, LambdaClient } from '@aws-sdk/client-lambda';
 
 const ajv = new AJV();
-
-interface Interaction {
-    data: {
-        id: string;
-        name: string;
-        options: Array<{
-            name: string;
-            value: string;
-        }>;
-    } | undefined;
-    type: number;
-}
 
 export const lambdaHandler = async (
     event: APIGatewayProxyEvent
 ): Promise<APIGatewayProxyResult> => {
-    const schema: JSONSchemaType<Interaction> = {
+    const schema: JSONSchemaType<UnverifiedInteraction> = {
         type: 'object',
         properties: {
             type: { type: 'integer' },
+            token: { type: 'string' },
             data: {
                 type: 'object',
                 properties: {
@@ -46,7 +35,7 @@ export const lambdaHandler = async (
                 nullable: true,
             }
         },
-        required: ['type'],
+        required: ['type', 'token'],
     }
     if (event.body === null) {
         throw Error('Event missing body');
@@ -67,11 +56,12 @@ export const lambdaHandler = async (
     const timestamp = event.headers['x-signature-timestamp']
     const discordPublicKey = process.env.DISCORD_PUBLIC_KEY;
 
-    if (signature === undefined || timestamp === undefined) {
+    if (!signature || !timestamp) {
         throw new Error('Missing expected headers');
     }
 
-    if (discordPublicKey === undefined) {
+    if (!discordPublicKey) {
+        console.log('Missing Environment Variable: DISCORD_PUBLIC_KEY');
         throw new Error('Server not properly configured');
     }
 
@@ -110,34 +100,23 @@ export const lambdaHandler = async (
         }
     }
 
-    let responseData: {
-        content: string,
-        flags?: number,
+    const commandRouterFunctionName = process.env.COMMAND_ROUTER_FUNCTION_NAME;
+    if (!commandRouterFunctionName) {
+        console.log('Missing Environment Variable: COMMAND_ROUTER_FUNCTION_NAME');
+        throw new Error('Server not properly configured');
     }
 
-    if (body.data.name === 'emojify') {
-        const emojifyEndpoint = process.env.EMOJIFY_ENDPOINT;
-        if (emojifyEndpoint === undefined) {
-            throw new Error('Server not properly configured');
-        }
-
-        const emojifyResponse = await axios.post(emojifyEndpoint, {
-            message: body.data.options[0].value
-        });
-        responseData = { content: emojifyResponse.data.message };
-    }
-    else if (body.data.name === 'roll') {
-        responseData = await rollProcessor(body.data.options[0].value);
-    }
-    else {
-        responseData = { content: 'Unknown slash command', flags: 1<<6 }
-    }
+    const client = new LambdaClient({});
+    await client.send(new InvokeCommand({
+        FunctionName: commandRouterFunctionName,
+        InvocationType: InvocationType.Event,
+        Payload: new TextEncoder().encode(JSON.stringify(body)),
+    }));
 
     return {
         statusCode: 200,
         body: JSON.stringify({
-            type: 4,
-            data: responseData
+            type: 5,
         }),
     };
 };
